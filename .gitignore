@@ -1,0 +1,5 @@
+password
+node_modules/
+package-lock.json
+rating.json
+data.json
