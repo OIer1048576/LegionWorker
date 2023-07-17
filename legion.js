@@ -381,66 +381,6 @@ async function updateRating() {
 
   // Calculate the results of all trainings, 
   //   homework, and contests comprehensively
-  await sleep(SLEEP);
-  var totalContest = { '1': 0, '2': 0, '3': 0, '4': 0 };
-  await superagent
-    .get(`https://oj.hailiangedu.com/d/hlxly2022/contest`)
-    .set('Accept', `application/json`)
-    .set('Cookie', COOKIE)
-    .then(async res => {
-      for (var contestId in res.body.tsdict) {
-        var tdoc = 0;
-        while (res.body.tdocs[tdoc].docId != contestId) tdoc++;
-        tdoc = res.body.tdocs[tdoc];
-        if (new Date(tdoc.beginAt).getTime() <
-          new Date('2023-07-04').getTime()) continue;
-        console.log(`Calculating Contest #${tdoc.docId}`);
-        var group = groupLevel[tdoc.assign[0]];
-        const rate = WEEKLY_CONTESTS.includes(tdoc.docId) ? WEEKLY_CONTESTS_RATE : 1;
-        await sleep(SLEEP);
-        await superagent
-          .get(`https://oj.hailiangedu.com/d/hlxly2022/contest/${tdoc.docId}/scoreboard`)
-          .set('Accept', `application/json`)
-          .set('Cookie', COOKIE)
-          .then(res => {
-            for (var uid in users) users[uid].tmp = 0;
-            var rank = 0, total = 0, lastScore = -1,
-              rows = res.body.rows, sumscore = 0, totalPerson = 0;
-            for (var row of rows) {
-              if (row[0].value == '#' || row[0].value == '0') continue;
-              if (!users[String(row[1].raw)]) continue;
-              if (group && group != users[String(row[1].raw)].group) continue;
-              if (row[2].value == 0) continue;
-
-              total++; if (row[2].value != lastScore)
-                rank = total, lastScore = row[2].value;
-
-              users[String(row[1].raw)].tmp = row[2].value,
-                sumscore += row[2].value;
-              if (row[2].value) totalPerson++;
-            }
-            if (sumscore != 0) {
-              if (group) totalContest[String(group)]++;
-              else for (var i = 1; i <= 4; i++)
-                totalContest[String(i)] += rate;
-              for (var uid in users) {
-                users[uid].rp.contest += sqrt(users[uid].tmp / (sumscore / totalPerson)) * 200 * rate;
-                if (users[uid].tmp >= 1) users[uid].totalContest += rate;
-              }
-            }
-          })
-          .catch(err => console.log(`Failed`));
-      }
-    })
-    .catch(err => console.log(`Failed`));
-  for (var uid in users) {
-    users[uid].rp.contest /= totalContest[String(users[uid].group)],
-      users[uid].rp.contest *= Math.sqrt(users[uid].totalContest / totalContest[String(users[uid].group)]);
-    users[uid].rpSum = users[uid].rp.contest;
-  }
-
-  var totalHomework = { '1': 0, '2': 0, '3': 0, '4': 0 };
-  for (var pageId = 1; pageId <= 2; pageId++) {
   failed = true;
   while (failed) {
     failed = false;
@@ -490,7 +430,7 @@ async function updateRating() {
                   else for (var i = 1; i <= 4; i++)
                     totalContest[String(i)] += rate;
                   for (var uid in users) {
-                    users[uid].rp.contest += users[uid].tmp / (sumscore / totalPerson) * 100 * rate;
+                    users[uid].rp.contest += Math.sqrt(users[uid].tmp / (sumscore / totalPerson)) * 200 * rate;
                     if (users[uid].tmp >= 1) users[uid].totalContest += rate;
                   }
                 }
