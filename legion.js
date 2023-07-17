@@ -2,14 +2,23 @@ const superagent = require('superagent');
 const { readFileSync, writeFileSync } = require('fs');
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms)), SLEEP = 1000;
 
-const Tip = `## 祝贺：本帖成为本域中首个超过 100 用户查看的帖子！
+const Tip = `## 祝贺：本帖成为本域中首个超过 100 用户查看的帖子，且是全域查看数量最高的帖子！
 
-可用脚本：
+## 军团介绍
+
+- 军团是 HLOI 开发的娱乐功能，未经过官方认可。
+- 军团内的成员使用统一的头像，经过一些 Rating 计算算法计算平均 Rating（可以理解为实力值）。
+- 军团内有一些成员成为管理员，其他成员称为普通成员。
+- 普通成员只有进入、退出某个军团的能力，而管理员的更多权利为：踢出某个成员，取消某个成员为管理员，提拔某个成员为管理员，从数据库**手动**刷新数据（每天自动刷新）。
+- 一个军团内的管理员数量需小于等于 $\\left\\lfloor\\dfrac n5+0.5\\right\\rfloor$，其中 $n$ 是团队的成员总数。
+- 目前本域共有 4 个军团，具体将在下面介绍。
+
+## 脚本
 
 | 脚本名 | 用法 | 说明 |
 | -: | :- | :- |
 | \`join\` | \`join:<legionId>;\` | 加入一个军团 |
-| \`exit\` | \`exit:<legionId>[,<userId>];\` | 退出一个军团 |
+| \`exit\` | \`exit:<legionId>[,<userId>];\` | 退出一个军团。当 \`<userid>\` 非空时，踢出某个成员（仅管理员可用） |
 | \`notice\` | \`notice:<legionId>,<notice>;\` | 设置军团公告（支持 Markdown，内容不要包含英文分号或逗号，你可以在 [这里](./64ad293a59e1ea388169b511/raw) 找到当前的 Markdown 代码，仅军团管理员可用） |
 | \`admin\` | \`admin:<legionId>,<userId>;\` | 调整一个军团的管理员，将其管理属性取反（仅管理员可用） |
 | \`update\` | \`update:0;\` | 立即从数据库更新数据（仅管理员可用） |
@@ -17,8 +26,9 @@ const Tip = `## 祝贺：本帖成为本域中首个超过 100 用户查看的�
 注：
 
 - legionId 处填写军团 ID，按照用法中的格式发送在评论区即可，会在 15 秒内处理完毕；
+- 请不要发送多余空格，且保证标点符号为半角；
 - 发送时请删除尖括号，且中括号内的部分是可选参数；
-- **不要发送代码块**，直接发送文本（具体间评论区域示例）；
+- **不要发送代码块**，直接发送文本（具体见评论区域示例）；
 - 脚本**不会处理已经被回复过的**评论！！！
 - 请自觉设置头像（允许作微小修改），违者加入团队黑名单。
 - 如果你希望贡献 Rating 算法：
@@ -105,7 +115,7 @@ async function publish() {
     return y.member.length - x.member.length
   });
   var Markdown = Tip;
-  Markdown += `\n\n管理员名单：\n\n`;
+  Markdown += `\n\n全域管理员名单：\n\n`;
   DATA.admin.forEach(uid => {
     Markdown += `- [](/user/${uid})\n`;
   });
@@ -113,7 +123,7 @@ async function publish() {
   for (var legion of DATA.legion) {
     var md = `## ${legion.name}\n\n本军团 ID 为 \`${legion.id}\`，共 ${legion.member.length} 人。\n\n`;
     if (legion.admin.length > 0) {
-      md += `### 管理员\n\n`;
+      md += `### 本军团管理员\n\n`;
       legion.admin.forEach(uid => {
         md += `- [](/user/${uid})\n`;
       });
@@ -169,6 +179,12 @@ async function publish() {
     }
     Markdown += `${md}\n`;
   }
+  Markdown += `## 常见问题
+- **问题** 为什么我加入了 A，B 两组，显示的是某一组？
+**答案** 经过综合考虑，“加入两个组别且活跃于更低的一组” 的人数远高于 “加入两个组别且活跃于更高的一组”，所以代码中用更低的组别计算。如果你认为这种计算方式不合理，请联系管理员特判你的 UID。
+- **问题** 为什么 “该用户暂未参与统计”？
+**答案** 为了防止低水平用户或未参加训练用户拉低军团水平，所以不统计 Rating 低于 100 的用户。
+  `
   Markdown += `---\n\nPublished by Molmin/LegionWorker at ${new Date().toLocaleString()} (Content Version ${DATA.version})`;
   await sleep(SLEEP);
   await superagent
@@ -397,7 +413,7 @@ async function updateRating() {
               else for (var i = 1; i <= 4; i++)
                 totalContest[String(i)] += rate;
               for (var uid in users) {
-                users[uid].rp.contest += users[uid].tmp / (sumscore / totalPerson) * 100 * rate;
+                users[uid].rp.contest += sqrt(users[uid].tmp / (sumscore / totalPerson)) * 200 * rate;
                 if (users[uid].tmp >= 1) users[uid].totalContest += rate;
               }
             }
