@@ -1,6 +1,6 @@
 const superagent = require('superagent');
 const { readFileSync, writeFileSync } = require('fs');
-const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms)), SLEEP = 1000;
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms)), SLEEP = 1500;
 
 const Tip = `## 祝贺：本帖成为本域中首个超过 100 用户查看的帖子！
 
@@ -175,7 +175,7 @@ async function publish() {
     .post(`https://oj.hailiangedu.com/d/hlxly2022/discuss/64ad293a59e1ea388169b511/edit`)
     .set('Accept', `application/json`)
     .set('Cookie', COOKIE)
-    .send({ title: '四大军团', operation: 'update', content: Markdown, pin: 'on' })
+    .send({ title: '五大军团', operation: 'update', content: Markdown, pin: 'on' })
     .then(res => {
       console.log(`Published!`);
     })
@@ -183,16 +183,20 @@ async function publish() {
 }
 
 async function deleteReply(drid) {
-  await sleep(SLEEP);
-  await superagent
-    .post(`https://oj.hailiangedu.com/d/hlxly2022/discuss/64ad293a59e1ea388169b511`)
-    .set('Accept', `application/json`)
-    .set('Cookie', COOKIE)
-    .send({ drid, operation: 'delete_reply' })
-    .then(res => {
-      console.log(`Deleted reply #${drid}`);
-    })
-    .catch(err => console.log(`Failed`));
+  var failed = true;
+  while (failed) {
+    failed = false;
+    await sleep(SLEEP);
+    await superagent
+      .post(`https://oj.hailiangedu.com/d/hlxly2022/discuss/64ad293a59e1ea388169b511`)
+      .set('Accept', `application/json`)
+      .set('Cookie', COOKIE)
+      .send({ drid, operation: 'delete_reply' })
+      .then(res => {
+        console.log(`Deleted reply #${drid}`);
+      })
+      .catch(err => { console.log(`Failed at Delete`); if (err) failed = true; });
+  }
 }
 
 async function check() {
@@ -324,88 +328,102 @@ async function updateRating() {
   users = {};
   if (!(await checkLogin())) await ensureLogin();
   console.log(`Calculating Users' Ratings ...`);
-  var startAt = new Date().getTime();
+  var startAt = new Date().getTime(), failed;
 
   // Obtain the user's group
-  await sleep(SLEEP);
   console.log(`Getting Group of Users ...`);
-  await superagent
-    .get(`https://oj.hailiangedu.com/d/hlxly2022/domain/group`)
-    .set('Accept', `application/json`)
-    .set('Cookie', COOKIE)
-    .then(res => {
-      var groups = res.body.groups;
-      groups.forEach(group => {
-        if (!groupLevel[group.name]) return;
-        var level = groupLevel[group.name];
-        group.uids.forEach(uid => {
-          if (!users[String(uid)])
-            return users[String(uid)] = {
-              uid, group: level, rp: { contest: 0, practice: 0, rank: 0 },
-              tmp: 0, totalContest: 0, totalHomework: 0
-            };
-          else if (users[String(uid)].group > level)
-            users[String(uid)].group = level;
+  failed = true;
+  while (failed) {
+    failed = false;
+    await sleep(SLEEP);
+    await superagent
+      .get(`https://oj.hailiangedu.com/d/hlxly2022/domain/group`)
+      .set('Accept', `application/json`)
+      .set('Cookie', COOKIE)
+      .then(res => {
+        var groups = res.body.groups;
+        groups.forEach(group => {
+          if (!groupLevel[group.name]) return;
+          var level = groupLevel[group.name];
+          group.uids.forEach(uid => {
+            if (!users[String(uid)])
+              return users[String(uid)] = {
+                uid, group: level, rp: { contest: 0, practice: 0, rank: 0 },
+                tmp: 0, totalContest: 0, totalHomework: 0
+              };
+            else if (users[String(uid)].group > level)
+              users[String(uid)].group = level;
+          });
         });
-      });
-    })
-    .catch(err => console.log(`Failed`));
+      })
+      .catch(err => { console.log(err); if (err) failed = true; });
+  }
+  for (var uid of [46]) users[String(uid)].group = 4;
   for (var uid of [127, 79, 321]) users[String(uid)].group = 3;
+  for (var uid of [177]) users[String(uid)].group = 2;
 
   // Calculate the results of all trainings, 
   //   homework, and contests comprehensively
-  await sleep(SLEEP);
-  var totalContest = { '1': 0, '2': 0, '3': 0, '4': 0 };
-  await superagent
-    .get(`https://oj.hailiangedu.com/d/hlxly2022/contest`)
-    .set('Accept', `application/json`)
-    .set('Cookie', COOKIE)
-    .then(async res => {
-      for (var contestId in res.body.tsdict) {
-        var tdoc = 0;
-        while (res.body.tdocs[tdoc].docId != contestId) tdoc++;
-        tdoc = res.body.tdocs[tdoc];
-        if (new Date(tdoc.beginAt).getTime() <
-          new Date('2023-07-04').getTime()) continue;
-        console.log(`Calculating Contest #${tdoc.docId}`);
-        var group = groupLevel[tdoc.assign[0]];
-        const rate = WEEKLY_CONTESTS.includes(tdoc.docId) ? WEEKLY_CONTESTS_RATE : 1;
-        await sleep(SLEEP);
-        await superagent
-          .get(`https://oj.hailiangedu.com/d/hlxly2022/contest/${tdoc.docId}/scoreboard`)
-          .set('Accept', `application/json`)
-          .set('Cookie', COOKIE)
-          .then(res => {
-            for (var uid in users) users[uid].tmp = 0;
-            var rank = 0, total = 0, lastScore = -1,
-              rows = res.body.rows, sumscore = 0, totalPerson = 0;
-            for (var row of rows) {
-              if (row[0].value == '#' || row[0].value == '0') continue;
-              if (!users[String(row[1].raw)]) continue;
-              if (group && group != users[String(row[1].raw)].group) continue;
-              if (row[2].value == 0) continue;
+  failed = true;
+  while (failed) {
+    failed = false;
+    await sleep(SLEEP);
+    var totalContest = { '1': 0, '2': 0, '3': 0, '4': 0 };
+    await superagent
+      .get(`https://oj.hailiangedu.com/d/hlxly2022/contest`)
+      .set('Accept', `application/json`)
+      .set('Cookie', COOKIE)
+      .then(async res => {
+        for (var contestId in res.body.tsdict) {
+          var tdoc = 0;
+          while (res.body.tdocs[tdoc].docId != contestId) tdoc++;
+          tdoc = res.body.tdocs[tdoc];
+          if (new Date(tdoc.beginAt).getTime() <
+            new Date('2023-07-04').getTime()) continue;
+          console.log(`Calculating Contest #${tdoc.docId}`);
+          var group = groupLevel[tdoc.assign[0]];
+          const rate = WEEKLY_CONTESTS.includes(tdoc.docId) ? WEEKLY_CONTESTS_RATE : 1;
+          var failed2 = true;
+          while (failed2) {
+            failed2 = false;
+            await sleep(SLEEP);
+            await superagent
+              .get(`https://oj.hailiangedu.com/d/hlxly2022/contest/${tdoc.docId}/scoreboard`)
+              .set('Accept', `application/json`)
+              .set('Cookie', COOKIE)
+              .then(res => {
+                for (var uid in users) users[uid].tmp = 0;
+                var rank = 0, total = 0, lastScore = -1,
+                  rows = res.body.rows, sumscore = 0, totalPerson = 0;
+                for (var row of rows) {
+                  if (row[0].value == '#' || row[0].value == '0') continue;
+                  if (!users[String(row[1].raw)]) continue;
+                  if (group && group != users[String(row[1].raw)].group) continue;
+                  if (row[2].value == 0) continue;
 
-              total++; if (row[2].value != lastScore)
-                rank = total, lastScore = row[2].value;
+                  total++; if (row[2].value != lastScore)
+                    rank = total, lastScore = row[2].value;
 
-              users[String(row[1].raw)].tmp = row[2].value,
-                sumscore += row[2].value;
-              if (row[2].value) totalPerson++;
-            }
-            if (sumscore != 0) {
-              if (group) totalContest[String(group)]++;
-              else for (var i = 1; i <= 4; i++)
-                totalContest[String(i)] += rate;
-              for (var uid in users) {
-                users[uid].rp.contest += users[uid].tmp / (sumscore / totalPerson) * 100 * rate;
-                if (users[uid].tmp >= 1) users[uid].totalContest += rate;
-              }
-            }
-          })
-          .catch(err => console.log(`Failed`));
-      }
-    })
-    .catch(err => console.log(`Failed`));
+                  users[String(row[1].raw)].tmp = row[2].value,
+                    sumscore += row[2].value;
+                  if (row[2].value) totalPerson++;
+                }
+                if (sumscore != 0) {
+                  if (group) totalContest[String(group)]++;
+                  else for (var i = 1; i <= 4; i++)
+                    totalContest[String(i)] += rate;
+                  for (var uid in users) {
+                    users[uid].rp.contest += users[uid].tmp / (sumscore / totalPerson) * 100 * rate;
+                    if (users[uid].tmp >= 1) users[uid].totalContest += rate;
+                  }
+                }
+              })
+              .catch(err => (console.log(`Failed`), err && (failed2 = true)));
+          }
+        }
+      })
+      .catch(err => (console.log(`Failed`), err && (failed = true)));
+  }
   for (var uid in users) {
     users[uid].rp.contest /= totalContest[String(users[uid].group)],
       users[uid].rp.contest *= Math.sqrt(users[uid].totalContest / totalContest[String(users[uid].group)]);
@@ -414,56 +432,127 @@ async function updateRating() {
 
   var totalHomework = { '1': 0, '2': 0, '3': 0, '4': 0 };
   for (var pageId = 1; pageId <= 2; pageId++) {
-    await sleep(SLEEP);
-    await superagent
-      .get(`https://oj.hailiangedu.com/d/hlxly2022/homework`)
-      .query({ page: pageId })
-      .set('Accept', `application/json`)
-      .set('Cookie', COOKIE)
-      .then(async res => {
-        for (var tdoc of res.body.tdocs) {
-          if (new Date(tdoc.beginAt).getTime() <
-            new Date('2023-07-03').getTime()) continue;
-          console.log(`Calculating Homework #${tdoc.docId}`);
-          var group = groupLevel[tdoc.assign[0]];
-          if (tdoc.docId == '64a8e12559e1ea3881605be4'
-            || tdoc.docId == '64b214512723396d990f8b92') group = -1;
-          if (!group) continue;
-          await sleep(SLEEP);
-          await superagent
-            .get(`https://oj.hailiangedu.com/d/hlxly2022/homework/${tdoc.docId}/scoreboard`)
-            .set('Accept', `application/json`)
-            .set('Cookie', COOKIE)
-            .then(res => {
-              for (var uid in users) users[uid].tmp = 0;
-              var rank = 0, total = 0, lastScore = -1, rows = res.body.rows, sumscore = 0, totalPerson = 0;
-              for (var row of rows) {
-                if (row[0].value == '#' || row[0].value == '0') continue;
-                if (!users[String(row[1].raw)]) continue;
-                if (group != -1 && group != users[String(row[1].raw)].group) continue;
-                if (row[2].value == 0) continue;
+    failed = true;
+    while (failed) {
+      failed = false;
+      await sleep(SLEEP);
+      await superagent
+        .get(`https://oj.hailiangedu.com/d/hlxly2022/training`)
+        .query({ page: pageId })
+        .set('Accept', `application/json`)
+        .set('Cookie', COOKIE)
+        .then(async res => {
+          for (var tid in res.body.tdict) {
+            var tdoc = res.body.tdict[tid];
+            var group = 0;
+            if (tdoc.title.startsWith('【入门组】')) group = 1;
+            if (tdoc.title.startsWith('【普及组】')) group = 2;
+            if (tdoc.title.startsWith('【提高组】')) group = 3;
+            if (tdoc.title.startsWith('【提高转省选】')) group = 4;
+            if (!group) continue;
+            console.log(`Calculating Training #${tdoc.docId}`);
 
-                total++; if (row[2].value != lastScore)
-                  rank = total, lastScore = row[2].value;
+            var failed2 = true;
+            while (failed2) {
+              failed2 = false;
+              await sleep(SLEEP);
+              await superagent
+                .get(`https://oj.hailiangedu.com/d/hlxly2022/training/${tdoc.docId}/scoreboard`)
+                .set('Accept', `application/json`)
+                .set('Cookie', COOKIE)
+                .then(res => {
+                  for (var uid in users) users[uid].tmp = 0;
+                  var rank = 0, total = 0, lastScore = -1, rows = res.body.rows, sumscore = 0, totalPerson = 0;
+                  for (var row of rows) {
+                    if (row[0].value == '#' || row[0].value == '0') continue;
+                    if (!users[String(row[1].raw)]) continue;
+                    if (group != users[String(row[1].raw)].group) continue;
+                    if (row[2].value == 0) continue;
 
-                users[String(row[1].raw)].tmp = row[2].value,
-                  sumscore += row[2].value;
-                if (row[2].value) totalPerson++;
-              }
-              if (sumscore != 0) {
-                if (group != -1) totalHomework[String(group)]++;
-                else for (var i = 1; i <= 4; i++)
-                  totalHomework[String(i)]++;
-                for (var uid in users) {
-                  users[uid].rp.practice += users[uid].tmp / (sumscore / totalPerson) * 150;
-                  if (users[uid].tmp >= 1) users[uid].totalHomework++;
-                }
-              }
-            })
-            .catch(err => console.log(`Failed`));
-        }
-      })
-      .catch(err => console.log());
+                    total++; if (row[2].value != lastScore)
+                      rank = total, lastScore = row[2].value;
+
+                    users[String(row[1].raw)].tmp = row[2].value,
+                      sumscore += row[2].value;
+                    if (row[2].value) totalPerson++;
+                  }
+                  if (sumscore != 0) {
+                    if (group != -1) totalHomework[String(group)]++;
+                    else for (var i = 1; i <= 4; i++)
+                      totalHomework[String(i)]++;
+                    for (var uid in users) {
+                      users[uid].rp.practice += users[uid].tmp / (sumscore / totalPerson) * 150;
+                      if (users[uid].tmp >= 1) users[uid].totalHomework++;
+                    }
+                  }
+                })
+                .catch(err => (console.log(`Failed`), err && (failed2 = true)));
+            }
+          }
+        })
+        .catch(err => (console.log(`Failed`), err && (failed = true)));
+    }
+  }
+  for (var pageId = 1; pageId <= 2; pageId++) {
+    failed = true;
+    while (failed) {
+      failed = false;
+      await sleep(SLEEP);
+      await superagent
+        .get(`https://oj.hailiangedu.com/d/hlxly2022/homework`)
+        .query({ page: pageId })
+        .set('Accept', `application/json`)
+        .set('Cookie', COOKIE)
+        .then(async res => {
+          for (var tdoc of res.body.tdocs) {
+            if (new Date(tdoc.beginAt).getTime() <
+              new Date('2023-07-03').getTime()) continue;
+            console.log(`Calculating Homework #${tdoc.docId}`);
+            var group = groupLevel[tdoc.assign[0]];
+            if (tdoc.docId == '64a8e12559e1ea3881605be4'
+              || tdoc.docId == '64b214512723396d990f8b92') group = -1;
+            if (!group) continue;
+
+            var failed2 = true;
+            while (failed2) {
+              failed2 = false;
+              await sleep(SLEEP);
+              await superagent
+                .get(`https://oj.hailiangedu.com/d/hlxly2022/homework/${tdoc.docId}/scoreboard`)
+                .set('Accept', `application/json`)
+                .set('Cookie', COOKIE)
+                .then(res => {
+                  for (var uid in users) users[uid].tmp = 0;
+                  var rank = 0, total = 0, lastScore = -1, rows = res.body.rows, sumscore = 0, totalPerson = 0;
+                  for (var row of rows) {
+                    if (row[0].value == '#' || row[0].value == '0') continue;
+                    if (!users[String(row[1].raw)]) continue;
+                    if (group != -1 && group != users[String(row[1].raw)].group) continue;
+                    if (row[2].value == 0) continue;
+
+                    total++; if (row[2].value != lastScore)
+                      rank = total, lastScore = row[2].value;
+
+                    users[String(row[1].raw)].tmp = row[2].value,
+                      sumscore += row[2].value;
+                    if (row[2].value) totalPerson++;
+                  }
+                  if (sumscore != 0) {
+                    if (group != -1) totalHomework[String(group)]++;
+                    else for (var i = 1; i <= 4; i++)
+                      totalHomework[String(i)]++;
+                    for (var uid in users) {
+                      users[uid].rp.practice += users[uid].tmp / (sumscore / totalPerson) * 150;
+                      if (users[uid].tmp >= 1) users[uid].totalHomework++;
+                    }
+                  }
+                })
+                .catch(err => (console.log(`Failed`), err && (failed2 = true)));
+            }
+          }
+        })
+        .catch(err => (console.log(`Failed`), err && (failed = true)));
+    }
   }
   for (var uid in users) {
     users[uid].rp.practice /= totalHomework[String(users[uid].group)],
