@@ -1,6 +1,6 @@
 const superagent = require('superagent');
 const { readFileSync, writeFileSync } = require('fs');
-const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms)), SLEEP = 1500;
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms)), SLEEP = 1000;
 
 const Tip = `## 祝贺：本帖成为本域中首个超过 100 用户查看的帖子，且一直保持全域查看数量最高！
 
@@ -527,11 +527,11 @@ async function updateRating() {
           for (var tdoc of res.body.tdocs) {
             if (new Date(tdoc.beginAt).getTime() <
               new Date('2023-07-03').getTime()) continue;
-            console.log(`Calculating Homework #${tdoc.docId}`);
             var group = groupLevel[tdoc.assign[0]];
             if (tdoc.docId == '64a8e12559e1ea3881605be4'
               || tdoc.docId == '64b214512723396d990f8b92') group = -1;
             if (!group) continue;
+            console.log(`Calculating Homework #${tdoc.docId}`);
 
             var failed2 = true;
             while (failed2) {
