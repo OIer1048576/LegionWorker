@@ -134,7 +134,7 @@ async function publish() {
       md += `### 公告\n\n${legion.notice}\n\n`;
     var totalMember = 0, RP = { sum: 0, contest: 0, practice: 0 }, id;
     for (var member of legion.member)
-      if (users[String(member)] && users[String(member)].rpSum >= 100) totalMember++;
+      if (users[String(member)] && users[String(member)].rpSum >= 180) totalMember++;
 
     legion.member = legion.member.sort((x, y) => {
       var xrp = users[String(x)] ? users[String(x)].rp.practice : 0;
@@ -143,7 +143,7 @@ async function publish() {
     });
     id = totalMember;
     for (var member of legion.member) {
-      if (users[String(member)] && users[String(member)].rpSum >= 100)
+      if (users[String(member)] && users[String(member)].rpSum >= 180)
         RP.practice += users[String(member)].rp.practice * id, id--;
     }
     RP.practice /= (1 + totalMember) * totalMember / 2;
@@ -155,7 +155,7 @@ async function publish() {
     });
     id = totalMember;
     for (var member of legion.member) {
-      if (users[String(member)] && users[String(member)].rpSum >= 100)
+      if (users[String(member)] && users[String(member)].rpSum >= 180)
         RP.contest += users[String(member)].rp.contest * id, id--;
     }
     RP.contest /= (1 + totalMember) * totalMember / 2;
@@ -167,24 +167,27 @@ async function publish() {
     });
     id = totalMember;
     for (var member of legion.member)
-      if (users[String(member)] && users[String(member)].rpSum >= 100)
+      if (users[String(member)] && users[String(member)].rpSum >= 180)
         RP.sum += users[String(member)].rpSum * id, id--;
     RP.sum /= (1 + totalMember) * totalMember / 2;
 
     md += `### 军团水平\n\n| 参与计算总人数 | 综合水平 | 比赛水平 | 练习水平 |\n| :-: | :-: | :-: | :-: |\n| ${totalMember} | ${(RP.sum.toFixed(2))} [](sum) | ${RP.contest.toFixed(2)} [](contest) | ${RP.practice.toFixed(2)} [](practice) |\n\n`;
     md += `### 成员\n\n| 所属小组 | 成员 | Rating | 比赛分 | 练习分 |\n| -: | :- | :-: | :-: | :-: |\n`;
     for (var member of legion.member) {
-      if (!users[String(member)] || users[String(member)].rpSum < 100)
+      if (!users[String(member)] || users[String(member)].rpSum < 180)
         md += `| | [](/user/${member}) | 该用户暂未参与统计。 | 该用户暂未参与统计。 | 该用户暂未参与统计。 |\n`;
       else md += `| ${['', '入门', '普及', '提高', '省选'][users[String(member)].group]} | [](/user/${member}) | **${users[String(member)].rpSum.toFixed(0)}** [](${member}#sum) | ${users[String(member)].rp.contest.toFixed(0)} [](${member}#contest) | ${users[String(member)].rp.practice.toFixed(0)} [](${member}#practice) |\n`;
     }
     Markdown += `${md}\n`;
   }
   Markdown += `## 常见问题
-- **问题** 为什么我加入了 A，B 两组，显示的是某一组？
-  **答案** 经过综合考虑，“加入两个组别且活跃于更低的一组” 的人数远高于 “加入两个组别且活跃于更高的一组”，所以代码中用更低的组别计算。如果你认为这种计算方式不合理，请联系管理员特判你的 UID。
-- **问题** 为什么 “该用户暂未参与统计”？
-  **答案** 为了防止低水平用户或未参加训练用户拉低军团水平，所以不统计 Rating 低于 100 的用户。
+- **Q：** 为什么我加入了 A，B 两组，显示的是某一组？
+  
+  **A：** 经过综合考虑，“加入两个组别且活跃于更低的一组” 的人数远高于 “加入两个组别且活跃于更高的一组”，所以代码中用更低的组别计算。如果你认为这种计算方式不合理，请联系管理员特判你的 UID。
+  
+- **Q：** 为什么 “该用户暂未参与统计”？
+  
+  **A：** 为了防止低水平用户或未参加训练用户拉低军团水平，所以不统计 Rating 低于 180 的用户。
   `
   Markdown += `---\n\nPublished by Molmin/LegionWorker at ${new Date().toLocaleString()} (Content Version ${DATA.version})`;
   await sleep(SLEEP);
