@@ -76,13 +76,13 @@ const Tip = `## 祝贺：本帖成为本域中首个超过 100 用户查看的�
     考虑一个小组 $g$, 我们定义一个函数 $N(g)$ 将入门 $\\mapsto 1$, 普及 $\\mapsto 2$, 提高 $\\mapsto 3$, 省选 $\\mapsto 4$. 再定义一个函数
 
     $$
-    T(x) = \\begin{cases} 4.8 & x = 1, \\\\ 2.4 & x = 2, \\\\ 1.2 & x = 3, \\\\ 0 & x \\ge 4. \\end{cases}
+    T(x) = \\begin{cases} 0.6 & x = 1, \\\\ 0.4 & x = 2, \\\\ 0.3 & x = 3, \\\\ 0 & x \\ge 4. \\end{cases}
     $$
 
     设 $x$ 是在 $g$ 小组中的一个人. ta 参与的全体比赛组成的集合为 $T_1$, 对于一个比赛 $c$, 我们定义 $\\operatorname{rank}_c x$ 是 $x$ 在 $c$ 比赛排名. 则 $x$ 的前三加分为:
 
     $$
-    R_3 = \\sum_{t \\in T_1} T\\left(\\operatorname{rank}_c x\\right) \\sqrt{N(g)},
+    R_3 = \\sum_{t \\in T_1} T\\left(\\operatorname{rank}_c x\\right) N(g)^2,
     $$
 
     最终的 Rating 为:
@@ -330,24 +330,23 @@ function rankingMarkdown() {
     publishdata.push(users[uid]);
   publishdata.sort((x, y) => y.rpSum - x.rpSum);
   for (var user of publishdata)
-    if (user.rpSum >= 0.001)
-      content += `| [](/user/${user.uid}) | **<font color="${getColor(user.rpSum)}">`
-        + `${user.rpSum.toFixed(0)}</font>** [](${user.uid}#sum) / `
-        + `<font color="${getColor(user.rp.contest * 2)}">`
-        + `${user.rp.contest.toFixed(0)}</font> [](${user.uid}#contest) / `
-        + `<font color="${getColor(user.rp.practice * 2)}">`
-        + `${user.rp.practice.toFixed(0)}</font> [](${user.uid}#practice) / `
-        + `<font color="${getColor(user.rp.rank.sum * 10)}">`
-        + `${user.rp.rank.sum.toFixed(0)}</font> [](${user.uid}#rank)`
-        + ' / ' + (user.rp.rank.gold
-          ? `**<font color="${rankColors.gold}">${user.rp.rank.gold}</font>**`
-          : `<font color="${rankColors.none}">0</font>`)
-        + ' / ' + (user.rp.rank.silver
-          ? `**<font color="${rankColors.silver}">${user.rp.rank.silver}</font>**`
-          : `<font color="${rankColors.none}">0</font>`)
-        + ' / ' + (user.rp.rank.bronze
-          ? `**<font color="${rankColors.bronze}">${user.rp.rank.bronze}</font>**`
-          : `<font color="${rankColors.none}">0</font>`) + '\n'
+    content += `| [](/user/${user.uid}) | **<font color="${getColor(user.rpSum)}">`
+      + `${user.rpSum.toFixed(0)}</font>** [](${user.uid}#sum) / `
+      + `<font color="${getColor(user.rp.contest * 2)}">`
+      + `${user.rp.contest.toFixed(0)}</font> [](${user.uid}#contest) / `
+      + `<font color="${getColor(user.rp.practice * 2)}">`
+      + `${user.rp.practice.toFixed(0)}</font> [](${user.uid}#practice) / `
+      + `<font color="${getColor(user.rp.rank.sum * 10)}">`
+      + `${user.rp.rank.sum.toFixed(0)}</font> [](${user.uid}#rank)`
+      + ' / ' + (user.rp.rank.gold
+        ? `**<font color="${rankColors.gold}">${user.rp.rank.gold}</font>**`
+        : `<font color="${rankColors.none}">0</font>`)
+      + ' / ' + (user.rp.rank.silver
+        ? `**<font color="${rankColors.silver}">${user.rp.rank.silver}</font>**`
+        : `<font color="${rankColors.none}">0</font>`)
+      + ' / ' + (user.rp.rank.bronze
+        ? `**<font color="${rankColors.bronze}">${user.rp.rank.bronze}</font>**`
+        : `<font color="${rankColors.none}">0</font>`) + '\n'
   content += `\n</details>`;
   return content;
 }
@@ -572,7 +571,7 @@ async function updateRating() {
               .set('Accept', `application/json`)
               .set('Cookie', COOKIE)
               .then(res => {
-                for (var uid in users) users[uid].tmp = users[uid].rank = 0;
+                for (var uid in users) users[uid].tmp = 0;
                 var groupRank = {}, rows = res.body.rows, sumscore = 0, totalPerson = 0;
                 for (var i = 1; i <= 4; i++)
                   groupRank[String(i)] = { now: 0, last: -1, total: 0 };
@@ -623,9 +622,9 @@ async function updateRating() {
     users[uid].rp.contest /= totalContest[String(users[uid].group)],
       users[uid].rp.contest *= Math.sqrt(users[uid].totalContest / totalContest[String(users[uid].group)]);
     users[uid].rpSum = users[uid].rp.contest;
-    users[uid].rp.rank.sum += users[uid].rp.rank.gold * 4.8 * Math.sqrt(users[uid].group);
-    users[uid].rp.rank.sum += users[uid].rp.rank.silver * 2.4 * Math.sqrt(users[uid].group);
-    users[uid].rp.rank.sum += users[uid].rp.rank.bronze * 1.2 * Math.sqrt(users[uid].group);
+    users[uid].rp.rank.sum += users[uid].rp.rank.gold * 0.3 * Math.pow(users[uid].group, 2);
+    users[uid].rp.rank.sum += users[uid].rp.rank.silver * 0.19 * Math.pow(users[uid].group, 2);
+    users[uid].rp.rank.sum += users[uid].rp.rank.bronze * 0.1 * Math.pow(users[uid].group, 2);
     users[uid].rpSum += users[uid].rp.rank.sum;
   }
 
