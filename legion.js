@@ -35,63 +35,7 @@ const Tip = `## 祝贺：本帖成为本域中首个超过 100 用户查看的�
 - 脚本**不会处理已经被回复过的**评论！！！
 - 如果你希望贡献 Rating 算法：
   - 首先我很懒，既然已经有了一个还算正常的算法，就懒得写新的了；
-  - 所以你可以去 [Molmin/LegionWorker](https://github.com/Molmin/LegionWorker.git) 贡献算法（你可以 Pull Request）；
-  - 当前计算规则：
-    
-    <details>
-    <summary>点此展开 / 收起</summary>
-
-    ### 计算某场比赛/作业/训练的表现
-
-    设比赛/作业/训练参与的人的 UID 组成的集合为 $S$, $\\operatorname{score}_{c} x$ 表示 UID 为 $x$ 的人在 $c$ 比赛/作业/训练中的得分, 则在这场比赛/作业/训练中, UID 为 $p$ 的人的表现为:
-
-    $$
-    \operatorname{perf}_c x = F\\left(\\dfrac{|S| \\cdot \\operatorname{score}_c x}{ \\sum_{s \\in S} \\operatorname{score}_c s} \\right)^P.
-    $$
-
-    其中对于比赛, $F = 2, P = 50$, 对于作业/训练, $F=1.5,P=120$.
-
-    ### 计算比赛/作业/训练的总 Rating
-
-    设 $g$ 是一个小组. 设在所有分配到 $g$ 小组的比赛组成的集合为 $S_1$, 所有分配到 $g$ 小组的作业组成的集合为 $S_2$, 所有分配到 $g$ 小组的训练组成的集合为 $S_3$. 对于比赛/作业/训练 $c$, 我们定义
-
-    $$
-    M(c) = \\begin{cases} 5 & c~\\text{是周赛}, \\ 1 &  c~\\text{不是周赛}. \\end{cases}
-    $$
-
-    (注意, 任意作业/训练的 $R$ 为 $1$.)
-
-    设 $x$ 是在 $g$ 小组中的一个人. ta 参与的全体比赛组成的集合为 $T_1$, ta 参与的全体作业组成的集合为 $T_2$, ta 参与的全体训练组成的集合为 $T_3$, 设
-
-    $$
-    \\begin{aligned}
-    r_i(x) = \\dfrac{|T_i|^{0.5} \\sum_{t \\in T_i} M(t) \\operatorname{perf}_t x}{|S_i|^{1.5}},
-    \\end{aligned}
-    $$
-
-    则 $x$ 的比赛分 $R_1$ 为 $r_1(x)$, $x$ 的练习分 $R_2$ 为 $r_2(x) + r_3(x)$.
-
-    ### 处理前三加分
-
-    考虑一个小组 $g$, 我们定义一个函数 $N(g)$ 将入门 $\\mapsto 1$, 普及 $\\mapsto 2$, 提高 $\\mapsto 3$, 省选 $\\mapsto 4$. 再定义一个函数
-
-    $$
-    T(x) = \\begin{cases} 2.2 & x = 1, \\\\ 1.4 & x = 2, \\\\ 0.6 & x = 3, \\\\ 0 & x \\ge 4. \\end{cases}
-    $$
-
-    设 $x$ 是在 $g$ 小组中的一个人. ta 参与的全体比赛组成的集合为 $T_1$, 对于一个比赛 $c$, 我们定义 $\\operatorname{rank}_c x$ 是 $x$ 在 $c$ 比赛排名. 则 $x$ 的前三加分为:
-
-    $$
-    R_3 = \\sum_{t \\in T_1} T\\left(\\operatorname{rank}_c x\\right) \\sqrt{N(g)},
-    $$
-
-    最终的 Rating 为:
-
-    $$
-    R_{\\rm final} = R_1 + R_2 + R_3.
-    $$
-
-    </details>
+  - 所以你可以去 [Molmin/LegionWorker](https://github.com/Molmin/LegionWorker.git) 贡献算法（你可以 Pull Request）。
 - 颜色列表：${Colors.map(color => `<font color="${color}">⭓</font>`).join('')}
 
 **特别注意：** 你可以在军团公告里宣传自己的军团，但不要在本帖评论区宣传 **单个军团**，谢谢。
@@ -291,7 +235,7 @@ async function publish(ratingMarkdown) {
 - **Q：** 为什么 “该用户暂未参与统计”？
   
   **A：** 为了防止低水平用户或未参加训练用户拉低军团水平，所以不统计 Rating 低于 60 的用户。`
-  Markdown += `\n\n---\n\nPublished by Molmin/LegionWorker at ${new Date().toLocaleString()} (Content Version ${DATA.version})`;
+  Markdown += `\n\n---\n\n${ratingMarkdown}\n\n---\n\nPublished by Molmin/LegionWorker at ${new Date().toLocaleString()} (Content Version ${DATA.version})`;
   await sleep(SLEEP);
   await superagent
     .post(`https://oj.hailiangedu.com/d/hlxly2022/discuss/64ad293a59e1ea388169b511/edit`)
@@ -301,17 +245,7 @@ async function publish(ratingMarkdown) {
     .then(res => {
       console.log(`Published!`);
     })
-    .catch(err => console.log('Failed'));
-  await sleep(SLEEP);
-  await superagent
-    .post(`https://oj.hailiangedu.com/d/hlxly2022/discuss/64ad293a59e1ea388169b511`)
-    .set('Accept', `application/json`)
-    .set('Cookie', COOKIE)
-    .send({ content: ratingMarkdown, drid: '64b8a428877c608172353364', operation: 'edit_reply' })
-    .then(res => {
-      console.log(`Updated Ranking!`);
-    })
-    .catch(err => console.log('Failed'));
+    .catch(err => console.log(`Failed`));
 }
 
 function rankingMarkdown() {
@@ -322,31 +256,32 @@ function rankingMarkdown() {
 <details>
 <summary>点此展开 / 收起</summary>
 
-| 成员 | 总分 / 比赛 / 练习 / 加分 / **<font color="${rankColors.gold}">金</font>**`
-    + ` / **<font color="${rankColors.silver}">银</font>** / **<font color="${rankColors.bronze}">铜</font>** |
-| :- | :- |\n`;
+| 小组 | 成员 | RP | 比赛 | 练习 | **<font color="${rankColors.gold}">金</font>**`
+    + ` / **<font color="${rankColors.silver}">银</font>** / **<font color="${rankColors.bronze}">铜</font>** / 加分 |
+| -: | :- | :-: | :-: | :-: | :-: |\n`;
   var publishdata = new Array();
   for (var uid in users)
     publishdata.push(users[uid]);
   publishdata.sort((x, y) => y.rpSum - x.rpSum);
   for (var user of publishdata)
-    content += `| [](/user/${user.uid}) | **<font color="${getColor(user.rpSum)}">`
-      + `${user.rpSum.toFixed(0)}</font>** [](${user.uid}#sum) / `
+    content += `| ${['', '入门', '普及', '提高', '省选'][user.group]} | `
+      + `[](/user/${user.uid}) | **<font color="${getColor(user.rpSum)}">`
+      + `${user.rpSum.toFixed(0)}</font>** [](${user.uid}#sum) | `
       + `<font color="${getColor(user.rp.contest * 2)}">`
-      + `${user.rp.contest.toFixed(0)}</font> [](${user.uid}#contest) / `
+      + `${user.rp.contest.toFixed(0)}</font> [](${user.uid}#contest) | `
       + `<font color="${getColor(user.rp.practice * 2)}">`
-      + `${user.rp.practice.toFixed(0)}</font> [](${user.uid}#practice) / `
-      + `<font color="${getColor(user.rp.rank.sum * 10)}">`
-      + `${user.rp.rank.sum.toFixed(0)}</font> [](${user.uid}#rank)`
-      + ' / ' + (user.rp.rank.gold
+      + `${user.rp.practice.toFixed(0)}</font> [](${user.uid}#practice) |`
+      + (user.rp.rank.gold
         ? `**<font color="${rankColors.gold}">${user.rp.rank.gold}</font>**`
         : `<font color="${rankColors.none}">0</font>`)
-      + ' / ' + (user.rp.rank.silver
+      + ' | ' + (user.rp.rank.silver
         ? `**<font color="${rankColors.silver}">${user.rp.rank.silver}</font>**`
         : `<font color="${rankColors.none}">0</font>`)
-      + ' / ' + (user.rp.rank.bronze
+      + ' | ' + (user.rp.rank.bronze
         ? `**<font color="${rankColors.bronze}">${user.rp.rank.bronze}</font>**`
-        : `<font color="${rankColors.none}">0</font>`) + '\n'
+        : `<font color="${rankColors.none}">0</font>`)
+      + ` | <font color="${getColor(user.rp.rank.sum * 10)}">`
+      + `${user.rp.rank.sum.toFixed(0)}</font> [](${user.uid}#rank) |\n`;
   content += `\n</details>`;
   return content;
 }
@@ -622,9 +557,9 @@ async function updateRating() {
     users[uid].rp.contest /= totalContest[String(users[uid].group)],
       users[uid].rp.contest *= Math.sqrt(users[uid].totalContest / totalContest[String(users[uid].group)]);
     users[uid].rpSum = users[uid].rp.contest;
-    users[uid].rp.rank.sum += users[uid].rp.rank.gold * 2.2 * Math.sqrt(users[uid].group);
-    users[uid].rp.rank.sum += users[uid].rp.rank.silver * 1.4 * Math.sqrt(users[uid].group);
-    users[uid].rp.rank.sum += users[uid].rp.rank.bronze * 0.6 * Math.sqrt(users[uid].group);
+    users[uid].rp.rank.sum += users[uid].rp.rank.gold * 0.3 * Math.pow(users[uid].group, 2);
+    users[uid].rp.rank.sum += users[uid].rp.rank.silver * 0.19 * Math.pow(users[uid].group, 2);
+    users[uid].rp.rank.sum += users[uid].rp.rank.bronze * 0.1 * Math.pow(users[uid].group, 2);
     users[uid].rpSum += users[uid].rp.rank.sum;
   }
 
