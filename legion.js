@@ -1,6 +1,7 @@
 const superagent = require('superagent');
 const { readFileSync, writeFileSync } = require('fs');
-const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms)), SLEEP = 1000;
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms)), SLEEP = 300;
+const { getColor, Colors } = require('./color.js');
 
 const Tip = `## 祝贺：本帖成为本域中首个超过 100 用户查看的帖子，且一直保持全域查看数量最高！
 
@@ -35,8 +36,13 @@ const Tip = `## 祝贺：本帖成为本域中首个超过 100 用户查看的�
 - 如果你希望贡献 Rating 算法：
   - 首先我很懒，既然已经有了一个还算正常的算法，就懒得写新的了；
   - 所以你可以去 [Molmin/LegionWorker](https://github.com/Molmin/LegionWorker.git) 贡献算法（你可以 Pull Request）。
+- 颜色列表：${Colors.map(color => `<font color="${color}">⭓</font>`).join('')}
 
-**特别注意：** 你可以在军团公告里宣传自己的军团，但不要在本帖评论区宣传 **单个军团**，谢谢。`;
+**特别注意：** 你可以在军团公告里宣传自己的军团，但不要在本帖评论区宣传 **单个军团**，谢谢。
+
+### 致谢
+
+感谢 [](/user/899) 对本项目的贡献（<https://github.com/Molmin/LegionWorker/pull/2>）`;
 
 var COOKIE = '', PASS = readFileSync('password', 'utf8').trim(),
   users = JSON.parse(readFileSync('rating.json', 'utf8')),
@@ -109,12 +115,72 @@ async function getRanking() {
   }
 }
 
-async function publish() {
+function calcLegionRating() {
+  for (var legionId in DATA.legion) {
+    var legion = DATA.legion[legionId];
+    var totalMember = 0, RP = { sum: 0, contest: 0, practice: 0, rank: 0 }, id;
+    for (var member of legion.member)
+      if (users[String(member)] && users[String(member)].rpSum >= 60) totalMember++;
+
+    legion.member = legion.member.sort((x, y) => {
+      var xrp = users[String(x)] ? users[String(x)].rp.practice : 0;
+      var yrp = users[String(y)] ? users[String(y)].rp.practice : 0;
+      return yrp - xrp;
+    });
+    id = totalMember;
+    for (var member of legion.member) {
+      if (users[String(member)] && users[String(member)].rpSum >= 60)
+        RP.practice += users[String(member)].rp.practice * id, id--;
+    }
+    RP.practice /= (1 + totalMember) * totalMember / 2;
+
+    legion.member = legion.member.sort((x, y) => {
+      var xrp = users[String(x)] ? users[String(x)].rp.contest : 0;
+      var yrp = users[String(y)] ? users[String(y)].rp.contest : 0;
+      return yrp - xrp;
+    });
+    id = totalMember;
+    for (var member of legion.member) {
+      if (users[String(member)] && users[String(member)].rpSum >= 60)
+        RP.contest += users[String(member)].rp.contest * id, id--;
+    }
+    RP.contest /= (1 + totalMember) * totalMember / 2;
+
+    legion.member = legion.member.sort((x, y) => {
+      var xrp = users[String(x)] ? users[String(x)].rp.rank.sum : 0;
+      var yrp = users[String(y)] ? users[String(y)].rp.rank.sum : 0;
+      return yrp - xrp;
+    });
+    id = totalMember;
+    for (var member of legion.member) {
+      if (users[String(member)] && users[String(member)].rpSum >= 60)
+        RP.rank += users[String(member)].rp.rank.sum * id, id--;
+    }
+    RP.rank /= (1 + totalMember) * totalMember / 2;
+
+    legion.member = legion.member.sort((x, y) => {
+      var xrp = users[String(x)] ? users[String(x)].rpSum : 0;
+      var yrp = users[String(y)] ? users[String(y)].rpSum : 0;
+      return yrp - xrp;
+    });
+    id = totalMember;
+    for (var member of legion.member)
+      if (users[String(member)] && users[String(member)].rpSum >= 60)
+        RP.sum += users[String(member)].rpSum * id, id--;
+    RP.sum /= (1 + totalMember) * totalMember / 2;
+
+    DATA.legion[legionId].rating = RP;
+    DATA.legion[legionId].totalMember = totalMember;
+  }
+}
+
+async function publish(ratingMarkdown) {
+  calcLegionRating();
+  DATA.legion = DATA.legion.sort((x, y) => {
+    return y.rating.sum - x.rating.sum
+  });
   writeFileSync('data.json', JSON.stringify(DATA, null, '    '));
   writeFileSync('rating.json', JSON.stringify(users, null, '    '));
-  DATA.legion = DATA.legion.sort((x, y) => {
-    return y.member.length - x.member.length
-  });
   var Markdown = Tip;
   Markdown += `\n\n系统管理员：\n\n`;
   DATA.admin.forEach(uid => {
@@ -132,74 +198,92 @@ async function publish() {
     }
     if (legion.notice.length > 0)
       md += `### 公告\n\n${legion.notice}\n\n`;
-    var totalMember = 0, RP = { sum: 0, contest: 0, practice: 0 }, id;
-    for (var member of legion.member)
-      if (users[String(member)] && users[String(member)].rpSum >= 180) totalMember++;
 
-    legion.member = legion.member.sort((x, y) => {
-      var xrp = users[String(x)] ? users[String(x)].rp.practice : 0;
-      var yrp = users[String(y)] ? users[String(y)].rp.practice : 0;
-      return yrp - xrp;
-    });
-    id = totalMember;
+    md += `### 军团水平\n\n| 参与计算总人数 | 综合水平 | 比赛水平 | 练习水平 | 加分 |\n`
+      + `| :-: | :-: | :-: | :-: | :-: |\n| ${legion.totalMember} | `
+      + `${(legion.rating.sum.toFixed(2))} [](sum) | `
+      + `${legion.rating.contest.toFixed(2)} [](contest) | `
+      + `${legion.rating.practice.toFixed(2)} [](practice) |`
+      + `${legion.rating.rank.toFixed(2)} [](rank) |\n\n`;
+    md += `### 成员\n\n| 小组 | 成员 | Rating | 比赛分 | 练习分 | 加分 |\n| -: | :- | :-: | :-: | :-: | :-: |\n`;
     for (var member of legion.member) {
-      if (users[String(member)] && users[String(member)].rpSum >= 180)
-        RP.practice += users[String(member)].rp.practice * id, id--;
-    }
-    RP.practice /= (1 + totalMember) * totalMember / 2;
-
-    legion.member = legion.member.sort((x, y) => {
-      var xrp = users[String(x)] ? users[String(x)].rp.contest : 0;
-      var yrp = users[String(y)] ? users[String(y)].rp.contest : 0;
-      return yrp - xrp;
-    });
-    id = totalMember;
-    for (var member of legion.member) {
-      if (users[String(member)] && users[String(member)].rpSum >= 180)
-        RP.contest += users[String(member)].rp.contest * id, id--;
-    }
-    RP.contest /= (1 + totalMember) * totalMember / 2;
-
-    legion.member = legion.member.sort((x, y) => {
-      var xrp = users[String(x)] ? users[String(x)].rpSum : 0;
-      var yrp = users[String(y)] ? users[String(y)].rpSum : 0;
-      return yrp - xrp;
-    });
-    id = totalMember;
-    for (var member of legion.member)
-      if (users[String(member)] && users[String(member)].rpSum >= 180)
-        RP.sum += users[String(member)].rpSum * id, id--;
-    RP.sum /= (1 + totalMember) * totalMember / 2;
-
-    md += `### 军团水平\n\n| 参与计算总人数 | 综合水平 | 比赛水平 | 练习水平 |\n| :-: | :-: | :-: | :-: |\n| ${totalMember} | ${(RP.sum.toFixed(2))} [](sum) | ${RP.contest.toFixed(2)} [](contest) | ${RP.practice.toFixed(2)} [](practice) |\n\n`;
-    md += `### 成员\n\n| 所属小组 | 成员 | Rating | 比赛分 | 练习分 |\n| -: | :- | :-: | :-: | :-: |\n`;
-    for (var member of legion.member) {
-      if (!users[String(member)] || users[String(member)].rpSum < 180)
-        md += `| | [](/user/${member}) | 该用户暂未参与统计。 | 该用户暂未参与统计。 | 该用户暂未参与统计。 |\n`;
-      else md += `| ${['', '入门', '普及', '提高', '省选'][users[String(member)].group]} | [](/user/${member}) | **${users[String(member)].rpSum.toFixed(0)}** [](${member}#sum) | ${users[String(member)].rp.contest.toFixed(0)} [](${member}#contest) | ${users[String(member)].rp.practice.toFixed(0)} [](${member}#practice) |\n`;
+      if (!users[String(member)])
+        md += `| | [](/user/${member}) | 该用户暂未参与统计。 | 该用户暂未参与统计。 | 该用户暂未参与统计。 | 该用户暂未参与统计。 |\n`;
+      else {
+        var displayRP = String(users[String(member)].rpSum.toFixed(0));
+        if (users[String(member)].rpSum < 60)
+          displayRP = `(${displayRP})`;
+        md += `| ${['', '入门', '普及', '提高', '省选'][users[String(member)].group]} | `
+          + `[](/user/${member}) | **<font color="${getColor(users[String(member)].rpSum)}">`
+          + `${displayRP}</font>** [](${member}#sum) | `
+          + `<font color="${getColor(users[String(member)].rp.contest * 2)}">`
+          + `${users[String(member)].rp.contest.toFixed(0)}</font> [](${member}#contest) | `
+          + `<font color="${getColor(users[String(member)].rp.practice * 2)}">`
+          + `${users[String(member)].rp.practice.toFixed(0)}</font> [](${member}#practice) |`
+          + `<font color="${getColor(users[String(member)].rp.rank.sum * 10)}">`
+          + `${users[String(member)].rp.rank.sum.toFixed(0)}</font> [](${member}#practice) |\n`;
+      }
     }
     Markdown += `${md}\n`;
   }
-  Markdown += `## 常见问题
+  Markdown += `\n\n---\n\n## 常见问题
+
 - **Q：** 为什么我加入了 A，B 两组，显示的是某一组？
   
   **A：** 经过综合考虑，“加入两个组别且活跃于更低的一组” 的人数远高于 “加入两个组别且活跃于更高的一组”，所以代码中用更低的组别计算。如果你认为这种计算方式不合理，请联系管理员特判你的 UID。
   
 - **Q：** 为什么 “该用户暂未参与统计”？
   
-  **A：** 为了防止低水平用户或未参加训练用户拉低军团水平，所以不统计 Rating 低于 180 的用户。
-  `
-  Markdown += `---\n\nPublished by Molmin/LegionWorker at ${new Date().toLocaleString()} (Content Version ${DATA.version})`;
+  **A：** 为了防止低水平用户或未参加训练用户拉低军团水平，所以不统计 Rating 低于 60 的用户。`
+  Markdown += `\n\n---\n\n${ratingMarkdown}\n\n---\n\nPublished by Molmin/LegionWorker at ${new Date().toLocaleString()} (Content Version ${DATA.version})`;
   await sleep(SLEEP);
   await superagent
     .post(`https://oj.hailiangedu.com/d/hlxly2022/discuss/64ad293a59e1ea388169b511/edit`)
     .set('Accept', `application/json`)
     .set('Cookie', COOKIE)
-    .send({ title: '五大军团', operation: 'update', content: Markdown, pin: 'on' })
+    .send({ title: `五大军团`, operation: 'update', content: Markdown, pin: 'on' })
     .then(res => {
       console.log(`Published!`);
     })
     .catch(err => console.log(`Failed`));
+}
+
+function rankingMarkdown() {
+  const rankColors = { gold: '#ebd511', silver: '#c5c5c5', bronze: '#c57534', none: '#ddd' };
+  var content = '';
+  content += `## 全站 Rating 排行榜
+
+<details>
+<summary>点此展开 / 收起</summary>
+
+| 小组 | 成员 | RP | 比赛 | 练习 | **<font color="${rankColors.gold}">金</font>**`
+    + ` / **<font color="${rankColors.silver}">银</font>** / **<font color="${rankColors.bronze}">铜</font>** / 加分 |
+| -: | :- | :-: | :-: | :-: | :-: |\n`;
+  var publishdata = new Array();
+  for (var uid in users)
+    publishdata.push(users[uid]);
+  publishdata.sort((x, y) => y.rpSum - x.rpSum);
+  for (var user of publishdata)
+    content += `| ${['', '入门', '普及', '提高', '省选'][user.group]} | `
+      + `[](/user/${user.uid}) | **<font color="${getColor(user.rpSum)}">`
+      + `${user.rpSum.toFixed(0)}</font>** [](${user.uid}#sum) | `
+      + `<font color="${getColor(user.rp.contest * 2)}">`
+      + `${user.rp.contest.toFixed(0)}</font> [](${user.uid}#contest) | `
+      + `<font color="${getColor(user.rp.practice * 2)}">`
+      + `${user.rp.practice.toFixed(0)}</font> [](${user.uid}#practice) |`
+      + (user.rp.rank.gold
+        ? `**<font color="${rankColors.gold}">${user.rp.rank.gold}</font>**`
+        : `<font color="${rankColors.none}">0</font>`)
+      + ' | ' + (user.rp.rank.silver
+        ? `**<font color="${rankColors.silver}">${user.rp.rank.silver}</font>**`
+        : `<font color="${rankColors.none}">0</font>`)
+      + ' | ' + (user.rp.rank.bronze
+        ? `**<font color="${rankColors.bronze}">${user.rp.rank.bronze}</font>**`
+        : `<font color="${rankColors.none}">0</font>`)
+      + ` | <font color="${getColor(user.rp.rank.sum * 10)}">`
+      + `${user.rp.rank.sum.toFixed(0)}</font> [](${user.uid}#rank) |\n`;
+  content += `\n</details>`;
+  return content;
 }
 
 async function deleteReply(drid) {
@@ -226,8 +310,8 @@ async function check() {
     .get(`https://oj.hailiangedu.com/d/hlxly2022/discuss/64ad293a59e1ea388169b511`)
     .set('Accept', `application/json`)
     .set('Cookie', COOKIE)
-    .then(res => {
-      var Reply = res.body.drdocs;
+    .then(async res => {
+      var Reply = res.body.drdocs, newComment = false;
       Reply.forEach(async reply => {
         async function getError(err) {
           await sleep(SLEEP);
@@ -241,6 +325,8 @@ async function check() {
             })
             .catch(err => console.log(err));
         }
+        if (!DATA.comments.includes(reply.docId))
+          DATA.comments.push(reply.docId), newComment = true;
         if ((!reply.reply || reply.reply.length == 0)
           && (/^[a-z]*?:[\s\S]*?;/.test(reply.content)
             || /`[a-z]*?:[\s\S]*?;/.test(reply.content))) {
@@ -258,9 +344,10 @@ async function check() {
               await getError('No permission.'); return;
             }
             DATA.version++;
+            newComment = false;
             await deleteReply(reply.docId);
-            await updateRating();
-            await publish();
+            if (vals == 'rating') await updateRating();
+            await publish(rankingMarkdown());
           }
           if (op == 'admin') {
             if (!DATA.admin.includes(user)) {
@@ -275,6 +362,7 @@ async function check() {
                 DATA.legion[findLegion(legion)].admin.filter(u => u != uid)
             else DATA.legion[findLegion(legion)].admin.push(uid);
             DATA.version++;
+            newComment = false;
             await deleteReply(reply.docId);
             await publish();
           }
@@ -289,6 +377,7 @@ async function check() {
             }
             DATA.legion[findLegion(legion)].notice = content;
             DATA.version++;
+            newComment = false;
             await deleteReply(reply.docId);
             await publish();
           }
@@ -309,6 +398,7 @@ async function check() {
               await getError('Already in one legion.'); return;
             }
             DATA.legion[findLegion(legion)].member.push(uid), DATA.version++;
+            newComment = false;
             await deleteReply(reply.docId);
             await publish();
           }
@@ -330,11 +420,13 @@ async function check() {
             }
             DATA.legion[findLegion(legion)].member
               = DATA.legion[findLegion(legion)].member.filter(u => u != uid), DATA.version++;
+            newComment = false;
             await deleteReply(reply.docId);
             await publish();
           }
         }
       });
+      // if (newComment) await publish();
     })
     .catch(err => console.log(`Failed`));
 }
@@ -368,8 +460,10 @@ async function updateRating() {
           group.uids.forEach(uid => {
             if (!users[String(uid)])
               return users[String(uid)] = {
-                uid, group: level, rp: { contest: 0, practice: 0, rank: 0 },
-                tmp: 0, totalContest: 0, totalHomework: 0
+                uid, group: level, rp: {
+                  contest: 0, practice: 0,
+                  rank: { gold: 0, silver: 0, bronze: 0, sum: 0 }
+                }, tmp: 0, rank: 0, totalContest: 0, totalHomework: 0
               };
             else if (users[String(uid)].group > level)
               users[String(uid)].group = level;
@@ -380,7 +474,7 @@ async function updateRating() {
   }
   for (var uid of [46]) users[String(uid)].group = 4;
   for (var uid of [127, 79, 321]) users[String(uid)].group = 3;
-  for (var uid of [177]) users[String(uid)].group = 2;
+  for (var uid of [177, 835]) users[String(uid)].group = 2;
 
   // Calculate the results of all trainings, 
   //   homework, and contests comprehensively
@@ -413,18 +507,30 @@ async function updateRating() {
               .set('Cookie', COOKIE)
               .then(res => {
                 for (var uid in users) users[uid].tmp = 0;
-                var rank = 0, total = 0, lastScore = -1,
-                  rows = res.body.rows, sumscore = 0, totalPerson = 0;
+                var groupRank = {}, rows = res.body.rows, sumscore = 0, totalPerson = 0;
+                for (var i = 1; i <= 4; i++)
+                  groupRank[String(i)] = { now: 0, last: -1, total: 0 };
                 for (var row of rows) {
                   if (row[0].value == '#' || row[0].value == '0') continue;
                   if (!users[String(row[1].raw)]) continue;
                   if (group && group != users[String(row[1].raw)].group) continue;
                   if (row[2].value == 0) continue;
 
-                  total++; if (row[2].value != lastScore)
-                    rank = total, lastScore = row[2].value;
-
-                  users[String(row[1].raw)].tmp = row[2].value,
+                  var rank;
+                  if (group) {
+                    groupRank[String(group)].total++;
+                    if (row[2].value != groupRank[String(group)].last)
+                      groupRank[String(group)].rank = rank = groupRank[String(group)].total,
+                        groupRank[String(group)].last = row[2].value;
+                  } else {
+                    var tmp = users[String(row[1].raw)].group;
+                    groupRank[String(tmp)].total++;
+                    if (row[2].value != groupRank[String(tmp)].last)
+                      groupRank[String(tmp)].rank = rank = groupRank[String(tmp)].total,
+                        groupRank[String(tmp)].last = row[2].value;
+                  }
+                  users[String(row[1].raw)].rank = rank,
+                    users[String(row[1].raw)].tmp = row[2].value,
                     sumscore += row[2].value;
                   if (row[2].value) totalPerson++;
                 }
@@ -433,7 +539,10 @@ async function updateRating() {
                   else for (var i = 1; i <= 4; i++)
                     totalContest[String(i)] += rate;
                   for (var uid in users) {
-                    users[uid].rp.contest += Math.sqrt(users[uid].tmp / (sumscore / totalPerson)) * 200 * rate;
+                    if (users[uid].rank == 1) users[uid].rp.rank.gold++;
+                    if (users[uid].rank == 2) users[uid].rp.rank.silver++;
+                    if (users[uid].rank == 3) users[uid].rp.rank.bronze++;
+                    users[uid].rp.contest += Math.pow(users[uid].tmp / (sumscore / totalPerson), 2) * 50 * rate;
                     if (users[uid].tmp >= 1) users[uid].totalContest += rate;
                   }
                 }
@@ -448,6 +557,10 @@ async function updateRating() {
     users[uid].rp.contest /= totalContest[String(users[uid].group)],
       users[uid].rp.contest *= Math.sqrt(users[uid].totalContest / totalContest[String(users[uid].group)]);
     users[uid].rpSum = users[uid].rp.contest;
+    users[uid].rp.rank.sum += users[uid].rp.rank.gold * 0.3 * Math.pow(users[uid].group, 2);
+    users[uid].rp.rank.sum += users[uid].rp.rank.silver * 0.19 * Math.pow(users[uid].group, 2);
+    users[uid].rp.rank.sum += users[uid].rp.rank.bronze * 0.1 * Math.pow(users[uid].group, 2);
+    users[uid].rpSum += users[uid].rp.rank.sum;
   }
 
   var totalHomework = { '1': 0, '2': 0, '3': 0, '4': 0 };
@@ -501,7 +614,7 @@ async function updateRating() {
                     else for (var i = 1; i <= 4; i++)
                       totalHomework[String(i)]++;
                     for (var uid in users) {
-                      users[uid].rp.practice += users[uid].tmp / (sumscore / totalPerson) * 150;
+                      users[uid].rp.practice += Math.pow(users[uid].tmp / (sumscore / totalPerson), 1.5) * 120;
                       if (users[uid].tmp >= 1) users[uid].totalHomework++;
                     }
                   }
@@ -562,7 +675,7 @@ async function updateRating() {
                     else for (var i = 1; i <= 4; i++)
                       totalHomework[String(i)]++;
                     for (var uid in users) {
-                      users[uid].rp.practice += users[uid].tmp / (sumscore / totalPerson) * 150;
+                      users[uid].rp.practice += Math.pow(users[uid].tmp / (sumscore / totalPerson), 1.5) * 120;
                       if (users[uid].tmp >= 1) users[uid].totalHomework++;
                     }
                   }
