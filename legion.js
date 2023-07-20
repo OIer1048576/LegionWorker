@@ -622,9 +622,9 @@ async function updateRating() {
     users[uid].rp.contest /= totalContest[String(users[uid].group)],
       users[uid].rp.contest *= Math.sqrt(users[uid].totalContest / totalContest[String(users[uid].group)]);
     users[uid].rpSum = users[uid].rp.contest;
-    users[uid].rp.rank.sum += users[uid].rp.rank.gold * 2.2 * Math.sqrt(users[uid].group);
-    users[uid].rp.rank.sum += users[uid].rp.rank.silver * 1.4 * Math.sqrt(users[uid].group);
-    users[uid].rp.rank.sum += users[uid].rp.rank.bronze * 0.6 * Math.sqrt(users[uid].group);
+    users[uid].rp.rank.sum += users[uid].rp.rank.gold * 0.3 * Math.pow(users[uid].group, 2);
+    users[uid].rp.rank.sum += users[uid].rp.rank.silver * 0.19 * Math.pow(users[uid].group, 2);
+    users[uid].rp.rank.sum += users[uid].rp.rank.bronze * 0.1 * Math.pow(users[uid].group, 2);
     users[uid].rpSum += users[uid].rp.rank.sum;
   }
 
