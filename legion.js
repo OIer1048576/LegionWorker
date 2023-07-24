@@ -49,14 +49,14 @@ const Tip = `## 祝贺：本帖成为本域中首个超过 100 用户查看的�
     \operatorname{perf}_c x = F\\left(\\dfrac{|S| \\cdot \\operatorname{score}_c x}{ \\sum_{s \\in S} \\operatorname{score}_c s} \\right)^P.
     $$
 
-    其中对于比赛, $F = 2, P = 50$, 对于作业/训练, $F=1.5,P=120$.
+    其中对于比赛, $F = 50, P = 2$, 对于作业/训练, $F = 120, P= 1.5$.
 
     ### 计算比赛/作业/训练的总 Rating
 
     设 $g$ 是一个小组. 设在所有分配到 $g$ 小组的比赛组成的集合为 $S_1$, 所有分配到 $g$ 小组的作业组成的集合为 $S_2$, 所有分配到 $g$ 小组的训练组成的集合为 $S_3$. 对于比赛/作业/训练 $c$, 我们定义
 
     $$
-    M(c) = \\begin{cases} 5 & c~\\text{是周赛}, \\ 1 &  c~\\text{不是周赛}. \\end{cases}
+    M(c) = \\begin{cases} 5 & c~\\text{是周赛}, \\\\ 1 &  c~\\text{不是周赛}. \\end{cases}
     $$
 
     (注意, 任意作业/训练的 $R$ 为 $1$.)
